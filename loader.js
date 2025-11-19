@@ -34,8 +34,7 @@ const cdnScripts = [
     "https://kaibertelsen.github.io/KonsernKontroll/konsernsum.js",
     "https://kaibertelsen.github.io/KonsernKontroll/useradmin.js",
 
-    "https://kaibertelsen.github.io/KonsernKontroll/dataprotection.js",
-
+ 
     "https://kaibertelsen.github.io/KonsernKontroll/startup.js"
 ];
 
