@@ -2,13 +2,14 @@
 //  KonsernKontroll – GLOBAL RESPONSE ROUTER
 // =======================================================================
 //
-//  Denne filen samler ALLE responsId → funksjon-handler koblinger.
-//  Men viktigere: Moduler kan selv registrere nye handlers i
-//  window.responseHandlers via Object.assign().
+//  Denne filen håndterer ALLE responsId → funksjon-handler koblinger.
+//  Moduler kan selv registrere nye handlers ved å gjøre:
+//
+//      Object.assign(window.responseHandlers, { respX: fn });
 //
 //  Dette betyr:
-//  - rootresponse.js trenger IKKE å oppdateres for hver modul!
-//  - så lenge modulene registrerer sine handlers
+//  - rootresponse.js skal sjelden endres
+//  - modulene kan registrere sine egne response handlers
 //
 // =======================================================================
 
@@ -19,35 +20,62 @@
 
 window.responseHandlers = window.responseHandlers || {};
 
-// Denne er her for å støtte eldre modulnavn / backward compatibility
+
+// =======================================================================
+//  LEGACY HANDLERS (BACKWARD COMPATIBILITY)
+// =======================================================================
+
 const legacyHandlers = {
     responsPatchStartup: data => responsPatchStartup?.(data),
     responsPostCustomer: data => responsPostCustomer?.(data),
     responsDelOrder: data => responsDelOrder?.(data)
 };
 
-// Slå sammen legacy → global
 Object.assign(window.responseHandlers, legacyHandlers);
 
 
 // =======================================================================
-//  HOVED FUNKSJON – ROUTER
+//  FIRST-RUN / SETUP HANDLERS
+// =======================================================================
+//
+//  Disse funksjonene blir registrert i startup.js:
+//      respCheckUsers
+//      respFirstUserCreated
+//      respClient
+//
+//  For å synliggjøre at systemet støtter nye routing-nøkler,
+//  legger vi dem inn som null-placeholder. Modulene overskriver dem.
+//
+
+Object.assign(window.responseHandlers, {
+    respCheckUsers: null,
+    respFirstUserCreated: null,
+    respClient: null
+});
+
+
+// =======================================================================
+//  HOVED ROUTER (API RESPONSE ENTRYPOINT)
 // =======================================================================
 
 function apiresponse(data, responsId) {
     console.log(`API Response (${responsId}):`, data);
 
     if (!responsId) {
-        console.warn("API-response mangler responsId. Data:", data);
+        console.warn("API-response mangler responsId. Full respons:", data);
         return;
     }
 
     const handler = window.responseHandlers[responsId];
 
     if (typeof handler === "function") {
-        handler(data);
+        try {
+            handler(data);
+        } catch (err) {
+            console.error(`Feil under kjøring av handler '${responsId}':`, err);
+        }
     } else {
-        console.warn(`Ingen handler funnet for responsId: '${responsId}'`);
+        console.warn(`⚠️ Ingen handler registrert for responsId '${responsId}'`);
     }
 }
 
@@ -56,7 +84,6 @@ function apiresponse(data, responsId) {
 //  EKSPORT
 // =======================================================================
 
-// Tilgjengelig i alle moduler
 window.apiresponse = apiresponse;
 
 console.log("KonsernKontroll Root Response Router loaded");
