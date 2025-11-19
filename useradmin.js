@@ -1,17 +1,11 @@
 // =======================================================================
 //  KonsernKontroll – USER ADMINISTRATION
-//  Supports: listing, creating, updating, deleting users
+//  Listing, creating, editing, deleting users
 // =======================================================================
 
-/*
-    GLOBAL STATE:
-    KK.user        = logged-in user
-    KK.client      = client data
-    KK.users       = all users in this client
-*/
-
+// GLOBAL NAMESPACE
 window.KK = window.KK || {};
-KK.users = [];
+KK.users = KK.users || [];
 
 
 // =======================================================================
@@ -20,26 +14,33 @@ KK.users = [];
 
 function openUserAdminModal() {
     const modal = document.getElementById("kk-user-admin-modal");
+    if (!modal) return console.error("User admin modal not found in DOM");
+    
     modal.style.display = "flex";
-
     loadUsersList();
 }
 
 function closeUserAdminModal() {
     const modal = document.getElementById("kk-user-admin-modal");
-    modal.style.display = "none";
+    if (modal) modal.style.display = "none";
 }
 
+// Buttons (if they exist in current view)
 document.getElementById("kk-admin-users-btn")?.addEventListener("click", openUserAdminModal);
 document.getElementById("kk-user-admin-close")?.addEventListener("click", closeUserAdminModal);
 
 
 // =======================================================================
-//   LOAD USERS (Controller + Superadmin only)
+//   LOAD USERS (Controller + Superadmin)
 // =======================================================================
 
 function loadUsersList() {
-    if (!KK.user || (!["controller", "superadmin"].includes(KK.user.role))) {
+    if (!KK.user) {
+        console.warn("KK.user not set yet");
+        return;
+    }
+
+    if (!["controller", "superadmin"].includes(KK.user.role)) {
         console.warn("User not allowed to load user list");
         return;
     }
@@ -51,8 +52,10 @@ function loadUsersList() {
     });
 }
 
-function responsUsersList(data) {
-    KK.users = data.rows || [];
+function respUsersList(data) {
+    console.log("User list response:", data);
+
+    KK.users = data?.rows || [];
     renderUsersList();
 }
 
@@ -63,6 +66,8 @@ function responsUsersList(data) {
 
 function renderUsersList() {
     const container = document.getElementById("kk-user-admin-list");
+    if (!container) return console.error("kk-user-admin-list not found");
+
     container.innerHTML = "";
 
     if (!KK.users.length) {
@@ -102,7 +107,7 @@ function renderUsersList() {
         container.appendChild(row);
     });
 
-    // Bind edit/save
+    // Bind "save" buttons
     container.querySelectorAll("[data-edit]").forEach(btn => {
         btn.addEventListener("click", () => {
             const userId = btn.getAttribute("data-edit");
@@ -110,7 +115,7 @@ function renderUsersList() {
         });
     });
 
-    // Bind delete
+    // Bind delete buttons
     container.querySelectorAll("[data-delete]").forEach(btn => {
         btn.addEventListener("click", () => {
             const userId = btn.getAttribute("data-delete");
@@ -126,6 +131,8 @@ function renderUsersList() {
 
 function saveUserChanges(userId) {
     const select = document.querySelector(`select[data-user-id="${userId}"]`);
+    if (!select) return;
+
     const newRole = select.value;
 
     patchNEON({
@@ -138,7 +145,7 @@ function saveUserChanges(userId) {
     });
 }
 
-function responsUserUpdated(data) {
+function respUserUpdated(data) {
     console.log("User updated", data);
     loadUsersList();
 }
@@ -158,7 +165,7 @@ function deleteUser(userId) {
     });
 }
 
-function responsUserDeleted(data) {
+function respUserDeleted(data) {
     console.log("User deleted", data);
     loadUsersList();
 }
@@ -187,16 +194,15 @@ function addNewUser() {
             name,
             email,
             role,
-            neonUserId: null // manually connect in Memberstack
+            neonUserId: null
         },
         responsId: "respUserCreated"
     });
 }
 
-function responsUserCreated(data) {
+function respUserCreated(data) {
     console.log("New user created", data);
 
-    // Clear fields
     document.getElementById("kk-new-user-name").value = "";
     document.getElementById("kk-new-user-email").value = "";
     document.getElementById("kk-new-user-role").value = "user";
@@ -206,7 +212,7 @@ function responsUserCreated(data) {
 
 
 // =======================================================================
-//   REGISTER HANDLERS IN GLOBAL MAP
+//   REGISTER HANDLERS GLOBALLY
 // =======================================================================
 
 window.responseHandlers = window.responseHandlers || {};
