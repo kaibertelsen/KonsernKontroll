@@ -15,19 +15,31 @@
     }
     
     // Liste over CDN-URL-er som skal lastes inn
-    const cdnScripts = [
-        "https://kaibertelsen.github.io/neonclientframe/neonApiClient.umd.js",
-        "https://kaibertelsen.github.io/KonsernKontroll/rootresponse.js",
-        "https://kaibertelsen.github.io/KonsernKontroll/usefunction.js",
-        "https://kaibertelsen.github.io/KonsernKontroll/startup.js",
-        "https://kaibertelsen.github.io/KonsernKontroll/useradmin.js",
-        "https://kaibertelsen.github.io/KonsernKontroll/kpi.js",
-        "https://kaibertelsen.github.io/KonsernKontroll/reporting.js",
-        "https://kaibertelsen.github.io/KonsernKontroll/budgetadmin.js",
-        "https://kaibertelsen.github.io/KonsernKontroll/companydetail.js",
-        "https://kaibertelsen.github.io/KonsernKontroll/konsernsum.js",
-        "https://kaibertelsen.github.io/KonsernKontroll/dataprotection.js"
-    ];
+// Liste over CDN-URL-er som skal lastes inn
+const cdnScripts = [
+    "https://kaibertelsen.github.io/neonclientframe/neonApiClient.umd.js",
+
+    "https://kaibertelsen.github.io/KonsernKontroll/rootresponse.js",
+    "https://kaibertelsen.github.io/KonsernKontroll/usefunction.js",
+
+    // Core + sort først
+    "https://kaibertelsen.github.io/KonsernKontroll/dashboardCore.js",
+    "https://kaibertelsen.github.io/KonsernKontroll/dashboardSort.js",
+
+    // Funksjonsmoduler
+    "https://kaibertelsen.github.io/KonsernKontroll/kpi.js",
+    "https://kaibertelsen.github.io/KonsernKontroll/reporting.js",
+    "https://kaibertelsen.github.io/KonsernKontroll/budgetadmin.js",
+    "https://kaibertelsen.github.io/KonsernKontroll/companydetail.js",
+    "https://kaibertelsen.github.io/KonsernKontroll/konsernsum.js",
+    "https://kaibertelsen.github.io/KonsernKontroll/useradmin.js",
+
+    "https://kaibertelsen.github.io/KonsernKontroll/dataprotection.js",
+
+    "https://kaibertelsen.github.io/KonsernKontroll/startup.js"
+];
+
+
     
     // Når alle scripts er ferdiglastet:
     cdnScripts.reduce((promise, script) => {
