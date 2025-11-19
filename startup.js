@@ -299,4 +299,7 @@ window.KK = {
   function capitalizeFirst(str) {
     return str.charAt(0).toUpperCase() + str.slice(1);
   }
+
+  KK.renderCompanies = renderCompanyCards; // kobler sorteringsmodulen til din UI-renderer
+
   
