@@ -25,7 +25,7 @@ function startUp() {
     // KALL 1: sjekk om det finnes brukere
     getNEON({
         table: "users",
-        where: {},               // hent alle
+        where: null,              // hent alle
         limit: 1,
         responsId: "respCheckUsers"
     });
