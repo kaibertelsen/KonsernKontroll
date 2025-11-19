@@ -1,6 +1,6 @@
 
 /* Denne skal ligge i webflow
-<script src="https://kaibertelsen.github.io/neonclientframe/loader.js"></script>
+<script src="https://kaibertelsen.github.io/KonsernKontroll/loader.js"></script>
 */
 
 
@@ -17,8 +17,8 @@
     // Liste over CDN-URL-er som skal lastes inn
     const cdnScripts = [
         "https://kaibertelsen.github.io/neonclientframe/neonApiClient.umd.js",
-        "https://kaibertelsen.github.io/neonclientframe/rootresponse.js",
-        "https://kaibertelsen.github.io/neonclientframe/usefunction.js"   
+        "https://kaibertelsen.github.io/KonsernKontroll/rootresponse.js",
+        "https://kaibertelsen.github.io/KonsernKontroll/usefunction.js"   
     ];
     
     // Laste inn alle skriptene sekvensielt
