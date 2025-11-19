@@ -18,14 +18,16 @@
     const cdnScripts = [
         "https://kaibertelsen.github.io/neonclientframe/neonApiClient.umd.js",
         "https://kaibertelsen.github.io/KonsernKontroll/rootresponse.js",
-        "https://kaibertelsen.github.io/KonsernKontroll/usefunction.js"   
+        "https://kaibertelsen.github.io/KonsernKontroll/usefunction.js",
+        "https://kaibertelsen.github.io/KonsernKontroll/startup.js" 
     ];
     
-    // Laste inn alle skriptene sekvensielt
+    // Når alle scripts er ferdiglastet:
     cdnScripts.reduce((promise, script) => {
         return promise.then(() => loadScript(script));
     }, Promise.resolve()).then(() => {
         console.log("All scripts loaded");
+        if (typeof startUp === "function") startUp();   // <–– KJØR START!
     }).catch(error => {
         console.error(error);
     });
