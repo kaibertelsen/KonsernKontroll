@@ -17,7 +17,7 @@
     // Liste over CDN-URL-er som skal lastes inn
 // Liste over CDN-URL-er som skal lastes inn
 const cdnScripts = [
-    "https://kaibertelsen.github.io/neonclientframe/neonApiClient.umd.js",
+    "https://kaibertelsen.github.io/KonsernKontroll/neonApiClient.umd.js",
 
     "https://kaibertelsen.github.io/KonsernKontroll/rootresponse.js",
     "https://kaibertelsen.github.io/KonsernKontroll/usefunction.js",
