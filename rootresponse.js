@@ -3,7 +3,6 @@ const responseHandlers = {
   responsPatchStartup: data => responsPatchStartup(data),
   responsPostCustomer: data => responsPostCustomer(data),
   responsDelOrder: data => responsDelOrder(data),
-
   // legg bare til nye her…
 };
 
