@@ -83,10 +83,12 @@ function createFirstSuperadmin() {
     // 1) Opprett klient
     postNEON({
         table: "clients",
-        data: {
-            name: "Mitt første konsern",
-            createdAt: new Date().toISOString()
-        },
+        data: [
+            {
+                name: "Mitt første konsern",
+                createdAt: new Date().toISOString()
+            }
+        ],
         responsId: "respFirstClientCreated"
     });
 }
