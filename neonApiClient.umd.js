@@ -101,7 +101,7 @@ async function postNEON({
   const options = {
     method: "POST",
     headers: isPublic ? {} : buildHeaders(),
-    body: JSON.stringify(Array.isArray(data) ? data : [data]),
+    body: JSON.stringify(data),
   };
 
   const res = await fetch(url, options);
