@@ -22,10 +22,9 @@ KK.client = null;
 function startUp() {
     console.log("KonsernKontroll startUp()…");
 
-    // KALL 1: sjekk om det finnes brukere
     getNEON({
         table: "users",
-        where: null,              // hent alle
+        where: null,
         limit: 1,
         responsId: "respCheckUsers"
     });
@@ -44,12 +43,9 @@ window.responseHandlers.respCheckUsers = function (data) {
 
     console.log("Brukere finnes → normal oppstart");
 
-    // ------------------------------
-    // Midlertidig hardkodet userId:
-    // ------------------------------
+    // Midlertidig hardkodet bruker
     const HARDCODED_USER_ID = 1;
 
-    // Last inn bruker-rad
     getNEON({
         table: "users",
         where: { id: HARDCODED_USER_ID },
@@ -64,9 +60,7 @@ window.responseHandlers.respCheckUsers = function (data) {
 
 function showFirstRunSetup() {
     document.getElementById("kk-initial-setup").classList.remove("kk-hidden");
-
-    const btn = document.getElementById("kk-setup-create-btn");
-    btn.onclick = createFirstSuperadmin;
+    document.getElementById("kk-setup-create-btn").onclick = createFirstSuperadmin;
 }
 
 function createFirstSuperadmin() {
@@ -80,7 +74,7 @@ function createFirstSuperadmin() {
 
     console.log("Oppretter første klient + superadmin…");
 
-    // 1) Opprett klient
+    // 1) OPPRETT KLIENT
     postNEON({
         table: "clients",
         data: [
@@ -104,16 +98,20 @@ window.responseHandlers.respFirstClientCreated = function (data) {
 
     KK.client = { id: clientId, name: "Mitt første konsern" };
 
-    // 2) Opprett superadmin
+    // 2) OPPRETT SUPERADMIN
     postNEON({
         table: "users",
-        data: {
-            clientId,
-            name: document.getElementById("kk-setup-name").value.trim(),
-            email: document.getElementById("kk-setup-email").value.trim(),
-            role: "superadmin",
-            neonUserId: null
-        },
+        data: [
+            {
+                clientId,
+                name: document.getElementById("kk-setup-name").value.trim(),
+                email: document.getElementById("kk-setup-email").value.trim(),
+                role: "superadmin",
+
+                // midlertidig fallback – du kan erstatte dette med Memberstack-ID
+                neonUserId: "__setup_superadmin__"
+            }
+        ],
         responsId: "respFirstUserCreated"
     });
 };
@@ -134,14 +132,13 @@ window.responseHandlers.respFirstUserCreated = function (data) {
 window.responseHandlers.respUserLoaded = function (data) {
     const user = data.rows?.[0];
     if (!user) {
-        alert("Fant ikke bruker-rad!");
+        alert("Fant ikke bruker!");
         return;
     }
 
     KK.user = user;
     console.log("Innlogget bruker:", user);
 
-    // Last klient
     getNEON({
         table: "clients",
         where: { id: user.clientId },
@@ -157,6 +154,7 @@ window.responseHandlers.respUserLoaded = function (data) {
 
 window.responseHandlers.respClientLoaded = function (data) {
     KK.client = data.rows?.[0];
+
     if (!KK.client) {
         alert("Fant ikke klient!");
         return;
@@ -164,17 +162,12 @@ window.responseHandlers.respClientLoaded = function (data) {
 
     console.log("Klient lastet:", KK.client);
 
-    // Oppdater dashboard-header
     document.getElementById("kk-client-name").textContent = KK.client.name;
 
-    // Start dashboardet
     if (typeof loadDashboard === "function") {
         loadDashboard();
-    } else {
-        console.warn("loadDashboard() ikke tilgjengelig enda.");
     }
 
-    // Vis dashboard
     document.getElementById("kk-dashboard").classList.remove("kk-hidden");
 };
 
