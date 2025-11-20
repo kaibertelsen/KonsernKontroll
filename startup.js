@@ -1,14 +1,6 @@
 // =======================================================================
 //  KonsernKontroll – STARTUP MODULE
 // =======================================================================
-//
-//  MODELL:
-//  1. Sjekk om det finnes brukere i databasen
-//  2. Hvis ingen → vis first-run setup skjerm
-//  3. Hvis brukere finnes → last inn innlogget bruker (hardkodet midlertidig)
-//  4. Last klient → last dashboard
-//
-// =======================================================================
 
 window.KK = window.KK || {};
 KK.user = null;
@@ -22,6 +14,7 @@ KK.client = null;
 function startUp() {
     console.log("KonsernKontroll startUp()…");
 
+    // ✔ sjekk om det finnes brukere i KK-databasen
     getNEON({
         table: "users",
         where: null,
@@ -43,12 +36,12 @@ window.responseHandlers.respCheckUsers = function (data) {
 
     console.log("Brukere finnes → normal oppstart");
 
-    // Midlertidig hardkodet bruker
-    const HARDCODED_USER_ID = 1;
+    // ⭐️ Ikke hardkod — last første bruker dynamisk
+    const firstUserId = data.rows[0].id;
 
     getNEON({
         table: "users",
-        where: { id: HARDCODED_USER_ID },
+        where: { id: firstUserId },
         responsId: "respUserLoaded"
     });
 };
@@ -74,7 +67,7 @@ function createFirstSuperadmin() {
 
     console.log("Oppretter første klient + superadmin…");
 
-    // 1) OPPRETT KLIENT
+    // ⭐️ send IKKE createdAt
     postNEON({
         table: "clients",
         data: [
@@ -89,7 +82,9 @@ function createFirstSuperadmin() {
 window.responseHandlers.respFirstClientCreated = function (data) {
     console.log("respFirstClientCreated:", data);
 
-    const clientId = data?.inserted?.rows?.[0]?.id;
+    // ⭐️ riktig datastruktur
+    const clientId = data?.inserted?.[0]?.id;
+
     if (!clientId) {
         alert("Kunne ikke opprette klient!");
         return;
@@ -107,7 +102,7 @@ window.responseHandlers.respFirstClientCreated = function (data) {
                 email: document.getElementById("kk-setup-email").value.trim(),
                 role: "superadmin",
 
-                // midlertidig fallback – du kan erstatte dette med Memberstack-ID
+                // ⭐️ midlertidig superadmin ID
                 neonUserId: "__setup_superadmin__"
             }
         ],
@@ -118,8 +113,18 @@ window.responseHandlers.respFirstClientCreated = function (data) {
 window.responseHandlers.respFirstUserCreated = function (data) {
     console.log("respFirstUserCreated:", data);
 
+    const userId = data?.inserted?.[0]?.id;
+
+    if (!userId) {
+        alert("Kunne ikke opprette superadmin!");
+        return;
+    }
+
+    KK.user = data.inserted[0];
+
     alert("Superadmin opprettet! Last siden på nytt.");
 
+    // ⭐️ reload er OK – nå vil GET users finne den nye brukeren
     location.reload();
 };
 
