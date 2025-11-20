@@ -89,7 +89,7 @@ function createFirstSuperadmin() {
 window.responseHandlers.respFirstClientCreated = function (data) {
     console.log("respFirstClientCreated:", data);
 
-    const clientId = data?.rows?.[0]?.id;
+    const clientId = data?.inserted?.rows?.[0]?.id;
     if (!clientId) {
         alert("Kunne ikke opprette klient!");
         return;
