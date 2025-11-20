@@ -79,8 +79,7 @@ function createFirstSuperadmin() {
         table: "clients",
         data: [
             {
-                name: "Mitt første konsern",
-                createdAt: new Date().toISOString()
+                name: "Mitt første konsern"
             }
         ],
         responsId: "respFirstClientCreated"
