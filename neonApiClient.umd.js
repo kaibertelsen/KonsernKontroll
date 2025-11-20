@@ -90,35 +90,32 @@ function getNEON({
 }
 
 /* ------------------ POST ------------------ */
-async function postNEON({
-  table,
-  data,
-  responsId,
-  public: isPublic = false
-}) {
+async function postNEON({ table, data, responsId, public = false }) {
   const url = `${API_BASE}/api/${table}`;
 
+  // sørger for at det alltid er et array
+  const bodyToSend = Array.isArray(data) ? data : [data];
+
+  console.log("POST BODY:", bodyToSend);
+  console.log("FINAL BODY SENT:", JSON.stringify(bodyToSend));
+
   const options = {
-    method: "POST",
-    headers: isPublic ? {} : buildHeaders(),
-    body: JSON.stringify(data),
+      method: "POST",
+      headers: public ? {} : buildHeaders(),
+      body: JSON.stringify(bodyToSend)
   };
 
   const res = await fetch(url, options);
 
-  if (!res.ok) throw new Error(`POST failed: ${res.status}`);
+  if (!res.ok) {
+      throw new Error(`POST failed: ${res.status}`);
+  }
 
   const json = await res.json();
 
-  apiresponse(
-    {
-      inserted: json.inserted,
-      insertedCount: json.insertedCount,
-      user: json.user
-    },
-    responsId
-  );
+  apiresponse(json, responsId);
 }
+
 
 /* ----------------- PATCH ------------------ */
 async function patchNEON({
