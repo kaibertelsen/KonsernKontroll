@@ -108,8 +108,10 @@ async function postNEON({ table, data, responsId, public = false }) {
   const res = await fetch(url, options);
 
   if (!res.ok) {
-      throw new Error(`POST failed: ${res.status}`);
-  }
+    const errorText = await res.text();
+    console.error("POST ERROR:", errorText);
+    throw new Error(`POST failed: ${res.status} - ${errorText}`);
+}
 
   const json = await res.json();
 
