@@ -1,162 +1,95 @@
-// =======================================================================
-//  KonsernKontroll – STARTUP MODULE
-// =======================================================================
+/* ===================================================================
+   KonsernKontroll – STARTUP ENGINE (FULL VERSION)
+   Laster ALLE nødvendige data før appen kan brukes
+=================================================================== */
 
-window.KK = window.KK || {};
-KK.user = null;
-KK.client = null;
+console.log("✓ KonsernKontroll startup.js loaded");
 
+window.KK = {
+    ready: false,
+    user: null,
+    client: null,
 
-// =======================================================================
-//  FIRST RUN CHECK
-// =======================================================================
+    companies: [],
+    kpiMeta: [],
+    kpiValues: [],
+    companySettings: [],
+    userCompanyAccess: []
+};
 
-function startUp() {
+/* ===================================================================
+   STARTUP FLOW
+=================================================================== */
+
+window.startUp = async function () {
     console.log("KonsernKontroll startUp()…");
 
-    // ✔ sjekk om det finnes brukere i KK-databasen
+    // 1) Sjekk om det finnes brukere
     getNEON({
         table: "users",
         where: null,
         limit: 1,
-        responsId: "respCheckUsers"
+        responsId: "startup_checkUsers"
     });
-}
+};
 
-window.responseHandlers.respCheckUsers = function (data) {
-    console.log("respCheckUsers:", data);
 
+/* ===================================================================
+   1: RESPONS – sjekk users først
+=================================================================== */
+
+window.responseHandlers.startup_checkUsers = function (data) {
     const count = data.rows?.length || 0;
 
     if (count === 0) {
-        console.warn("🚨 Ingen brukere i systemet → FIRST RUN MODE");
-        showFirstRunSetup();
+        console.warn("🚨 Ingen brukere → FIRST RUN MODE");
+        document.getElementById("kk-initial-setup").classList.remove("kk-hidden");
+        document.getElementById("kk-setup-create-btn").onclick = createFirstSuperadmin;
         return;
     }
 
     console.log("Brukere finnes → normal oppstart");
 
-    // ⭐️ Ikke hardkod — last første bruker dynamisk
-    const firstUserId = data.rows[0].id;
+    // Midlertidig hardkodet
+    const HARDCODED_USER_ID = 1;
 
     getNEON({
         table: "users",
-        where: { id: firstUserId },
-        responsId: "respUserLoaded"
+        where: { id: HARDCODED_USER_ID },
+        responsId: "startup_userLoaded"
     });
 };
 
 
-// =======================================================================
-//  FIRST RUN UI
-// =======================================================================
+/* ===================================================================
+   2: RESPONS – innlogget bruker lastet
+=================================================================== */
 
-function showFirstRunSetup() {
-    document.getElementById("kk-initial-setup").classList.remove("kk-hidden");
-    document.getElementById("kk-setup-create-btn").onclick = createFirstSuperadmin;
-}
+window.responseHandlers.startup_userLoaded = function (data) {
+    KK.user = data.rows?.[0];
 
-function createFirstSuperadmin() {
-    const email = document.getElementById("kk-setup-email").value.trim();
-    const name = document.getElementById("kk-setup-name").value.trim();
-
-    if (!email || !name) {
-        alert("Du må skrive inn navn og e-post");
-        return;
-    }
-
-    console.log("Oppretter første klient + superadmin…");
-
-    // ⭐️ send IKKE createdAt
-    postNEON({
-        table: "clients",
-        data: [
-            {
-                name: "Mitt første konsern"
-            }
-        ],
-        responsId: "respFirstClientCreated"
-    });
-}
-
-window.responseHandlers.respFirstClientCreated = function (data) {
-    console.log("respFirstClientCreated:", data);
-
-    // ⭐️ riktig datastruktur
-    const clientId = data?.inserted?.[0]?.id;
-
-    if (!clientId) {
-        alert("Kunne ikke opprette klient!");
-        return;
-    }
-
-    KK.client = { id: clientId, name: "Mitt første konsern" };
-
-    // 2) OPPRETT SUPERADMIN
-    postNEON({
-        table: "users",
-        data: [
-            {
-                clientId,
-                name: document.getElementById("kk-setup-name").value.trim(),
-                email: document.getElementById("kk-setup-email").value.trim(),
-                role: "superadmin",
-
-                // ⭐️ midlertidig superadmin ID
-                neonUserId: "__setup_superadmin__"
-            }
-        ],
-        responsId: "respFirstUserCreated"
-    });
-};
-
-window.responseHandlers.respFirstUserCreated = function (data) {
-    console.log("respFirstUserCreated:", data);
-
-    const userId = data?.inserted?.[0]?.id;
-
-    if (!userId) {
-        alert("Kunne ikke opprette superadmin!");
-        return;
-    }
-
-    KK.user = data.inserted[0];
-
-    alert("Superadmin opprettet! Last siden på nytt.");
-
-    // ⭐️ reload er OK – nå vil GET users finne den nye brukeren
-    location.reload();
-};
-
-
-// =======================================================================
-//  NORMAL OPPSTART – LASTER BRUKER
-// =======================================================================
-
-window.responseHandlers.respUserLoaded = function (data) {
-    const user = data.rows?.[0];
-    if (!user) {
+    if (!KK.user) {
         alert("Fant ikke bruker!");
         return;
     }
 
-    KK.user = user;
-    console.log("Innlogget bruker:", user);
+    console.log("Innlogget bruker:", KK.user);
 
+    // Last inn klient
     getNEON({
         table: "clients",
-        where: { id: user.clientId },
+        where: { id: KK.user.clientId },
         limit: 1,
-        responsId: "respClientLoaded"
+        responsId: "startup_clientLoaded"
     });
 };
 
 
-// =======================================================================
-//  NORMAL OPPSTART – LASTER KLIENT
-// =======================================================================
+/* ===================================================================
+   3: RESPONS – klient lastet, start datalastingen
+=================================================================== */
 
-window.responseHandlers.respClientLoaded = function (data) {
+window.responseHandlers.startup_clientLoaded = function (data) {
     KK.client = data.rows?.[0];
 
     if (!KK.client) {
@@ -166,20 +99,145 @@ window.responseHandlers.respClientLoaded = function (data) {
 
     console.log("Klient lastet:", KK.client);
 
-    document.getElementById("kk-client-name").textContent = KK.client.name;
-
-    if (typeof loadDashboard === "function") {
-        loadDashboard();
-    }
-
-    document.getElementById("kk-dashboard").classList.remove("kk-hidden");
+    // START PARALLELL DATAHENTING
+    loadAllCoreData();
 };
 
 
-// =======================================================================
-//  EKSPORT
-// =======================================================================
+/* ===================================================================
+   4: LAST ALLE DATA PARALLELT
+=================================================================== */
 
-window.startUp = startUp;
+function loadAllCoreData() {
+    console.log("Henter selskaper, meta, kpi, settings…");
 
-console.log("startup.js loaded");
+    getNEON({ table: "companies", where: { clientId: KK.client.id }, responsId: "startup_companies" });
+    getNEON({ table: "kpi_meta", responsId: "startup_kpiMeta" });
+    getNEON({ table: "kpi_values", responsId: "startup_kpiValues" });
+    getNEON({ table: "company_settings", responsId: "startup_companySettings" });
+
+    // Hvis controller/user:
+    getNEON({ table: "user_companies", where: { userId: KK.user.id }, responsId: "startup_userCompanyAccess" });
+}
+
+
+/* ===================================================================
+   5: RESPONS – lagre dataene i KK
+=================================================================== */
+
+window.responseHandlers.startup_companies = function (data) {
+    KK.companies = data.rows || [];
+    checkIfStartupComplete();
+};
+
+window.responseHandlers.startup_kpiMeta = function (data) {
+    KK.kpiMeta = data.rows || [];
+    checkIfStartupComplete();
+};
+
+window.responseHandlers.startup_kpiValues = function (data) {
+    KK.kpiValues = data.rows || [];
+    checkIfStartupComplete();
+};
+
+window.responseHandlers.startup_companySettings = function (data) {
+    KK.companySettings = data.rows || [];
+    checkIfStartupComplete();
+};
+
+window.responseHandlers.startup_userCompanyAccess = function (data) {
+    KK.userCompanyAccess = data.rows || [];
+    checkIfStartupComplete();
+};
+
+
+/* ===================================================================
+   6: SYNKRONISER — vent til ALLE 5 datasett er lastet
+=================================================================== */
+
+let startupLoaded = {
+    companies: false,
+    kpiMeta: false,
+    kpiValues: false,
+    companySettings: false,
+    userCompanyAccess: false
+};
+
+function checkIfStartupComplete() {
+
+    // Mark lastet respons
+    const lastCall = Object.keys(window.responseHandlers).find(k => k.startsWith("startup_"));
+
+    if (lastCall === "startup_companies") startupLoaded.companies = true;
+    if (lastCall === "startup_kpiMeta") startupLoaded.kpiMeta = true;
+    if (lastCall === "startup_kpiValues") startupLoaded.kpiValues = true;
+    if (lastCall === "startup_companySettings") startupLoaded.companySettings = true;
+    if (lastCall === "startup_userCompanyAccess") startupLoaded.userCompanyAccess = true;
+
+    const allDone =
+        startupLoaded.companies &&
+        startupLoaded.kpiMeta &&
+        startupLoaded.kpiValues &&
+        startupLoaded.companySettings &&
+        startupLoaded.userCompanyAccess;
+
+    if (!allDone) return;
+
+    console.log("🎉 ALL CORE DATA LOADED — READY!");
+
+    KK.ready = true;
+
+    // VIS DASHBOARD
+    document.getElementById("kk-dashboard").classList.remove("kk-hidden");
+
+    // Tegn dashboardet
+    if (typeof window.KK.renderDashboardCompanies === "function") {
+        window.KK.renderDashboardCompanies(KK.companies);
+    }
+}
+
+
+/* ===================================================================
+   OPPRETTE SUPERADMIN (FIRST RUN)
+=================================================================== */
+
+function createFirstSuperadmin() {
+    const email = document.getElementById("kk-setup-email").value.trim();
+    const name  = document.getElementById("kk-setup-name").value.trim();
+
+    if (!email || !name) {
+        alert("Du må skrive inn navn og e-post");
+        return;
+    }
+
+    console.log("Oppretter første klient + superadmin…");
+
+    postNEON({
+        table: "clients",
+        data: [{ name: "Mitt første konsern" }],
+        responsId: "startup_firstClient"
+    });
+}
+
+window.responseHandlers.startup_firstClient = function (data) {
+    const clientId = data?.inserted?.[0]?.id;
+    if (!clientId) return alert("Feil ved opprettelse av klient!");
+
+    postNEON({
+        table: "users",
+        data: [{
+            clientId,
+            name: document.getElementById("kk-setup-name").value.trim(),
+            email: document.getElementById("kk-setup-email").value.trim(),
+            role: "superadmin",
+            neonUserId: "__setup__"
+        }],
+        responsId: "startup_firstUser"
+    });
+};
+
+window.responseHandlers.startup_firstUser = function () {
+    alert("Superadmin opprettet. Last siden på nytt.");
+    location.reload();
+};
+
