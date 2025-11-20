@@ -51,7 +51,7 @@ window.responseHandlers.startup_checkUsers = function (data) {
     console.log("Brukere finnes → normal oppstart");
 
     // Midlertidig hardkodet
-    const HARDCODED_USER_ID = 1;
+    const HARDCODED_USER_ID = 4;
 
     getNEON({
         table: "users",
