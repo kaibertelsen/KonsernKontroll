@@ -17,25 +17,9 @@
     // Liste over CDN-URL-er som skal lastes inn
 // Liste over CDN-URL-er som skal lastes inn
 const cdnScripts = [
-    "https://kaibertelsen.github.io/KonsernKontroll/neonApiClient.umd.js",
-
-    "https://kaibertelsen.github.io/KonsernKontroll/rootresponse.js",
-    "https://kaibertelsen.github.io/KonsernKontroll/usefunction.js",
-
-    // Core + sort først
-    "https://kaibertelsen.github.io/KonsernKontroll/dashboardCore.js",
-    "https://kaibertelsen.github.io/KonsernKontroll/dashboardSort.js",
-
-    // Funksjonsmoduler
-    "https://kaibertelsen.github.io/KonsernKontroll/kpi.js",
-    "https://kaibertelsen.github.io/KonsernKontroll/reporting.js",
-    "https://kaibertelsen.github.io/KonsernKontroll/budgetadmin.js",
-    "https://kaibertelsen.github.io/KonsernKontroll/companydetail.js",
-    "https://kaibertelsen.github.io/KonsernKontroll/konsernsum.js",
-    "https://kaibertelsen.github.io/KonsernKontroll/useradmin.js",
-
- 
-    "https://kaibertelsen.github.io/KonsernKontroll/startup.js"
+    "https://kaibertelsen.github.io/KonsernKontroll/vendor-neonApiClient.js",
+    "https://kaibertelsen.github.io/KonsernKontroll/KK.bundle.js",
+    
 ];
 
 
