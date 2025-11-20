@@ -4,18 +4,23 @@
 
 window.KK = window.KK || {};
 
-// ------------------------- Init -------------------------
+console.log("✓ Reporting engine loaded");
+
+// =======================================================================
+//  INIT
+// =======================================================================
 
 document.addEventListener("DOMContentLoaded", () => {
-    if (!window.KK.ready) {
-        console.warn("startup.js har ikke lastet ferdig enda");
+    if (!KK.ready) {
+        console.warn("Reporting: KK not ready yet");
         return;
     }
     initReportPanel();
 });
 
-
-// ------------------------- Build UI -------------------------
+// =======================================================================
+//  INIT UI
+// =======================================================================
 
 function initReportPanel() {
     console.log("Report panel init...");
@@ -24,21 +29,24 @@ function initReportPanel() {
     populateMonthDropdown();
     populateCompanyDropdown();
 
-    document.getElementById("kk-report-submit")
-        .addEventListener("click", submitReporting);
+    const submitBtn = document.getElementById("kk-report-submit");
+    if (submitBtn) submitBtn.addEventListener("click", submitReporting);
 }
 
-
-// ------------------------- Dropdowns -------------------------
+// =======================================================================
+//  COMPANY DROPDOWN
+// =======================================================================
 
 function populateCompanyDropdown() {
     const sel = document.getElementById("kk-report-company");
+    if (!sel) return;
     sel.innerHTML = "";
 
     let list = [];
 
-    if (KK.user.role === "user") {
-        list = KK.companies.filter(c => 
+    // Hvis brukeren kun har tilgang til enkelte selskaper
+    if (KK.user.role === "user" && Array.isArray(KK.userCompanyAccess)) {
+        list = KK.companies.filter(c =>
             KK.userCompanyAccess.some(a => a.companyId === c.id)
         );
     } else {
@@ -53,9 +61,14 @@ function populateCompanyDropdown() {
     });
 }
 
+// =======================================================================
+//  YEAR DROPDOWN
+// =======================================================================
 
 function populateYearDropdown() {
     const sel = document.getElementById("kk-report-year");
+    if (!sel) return;
+
     sel.innerHTML = "";
 
     const yearNow = new Date().getFullYear();
@@ -69,9 +82,14 @@ function populateYearDropdown() {
     }
 }
 
+// =======================================================================
+//  MONTH DROPDOWN
+// =======================================================================
 
 function populateMonthDropdown() {
     const sel = document.getElementById("kk-report-month");
+    if (!sel) return;
+
     sel.innerHTML = "";
 
     const months = [
@@ -82,35 +100,37 @@ function populateMonthDropdown() {
     const mNow = new Date().getMonth() + 1;
 
     months.forEach((txt, index) => {
-        const o = document.createElement("option");
-        o.value = index + 1;
-        o.text = txt;
-        if (index + 1 === mNow) o.selected = true;
-        sel.appendChild(o);
+        const opt = document.createElement("option");
+        opt.value = index + 1;
+        opt.textContent = txt;
+        if (index + 1 === mNow) opt.selected = true;
+        sel.appendChild(opt);
     });
 }
 
-
-// ------------------------- Submit -------------------------
+// =======================================================================
+//  SUBMIT REPORTING
+// =======================================================================
 
 function submitReporting() {
     const companyId = Number(document.getElementById("kk-report-company").value);
-    const year = Number(document.getElementById("kk-report-year").value);
-    const month = Number(document.getElementById("kk-report-month").value);
+    const year      = Number(document.getElementById("kk-report-year").value);
+    const month     = Number(document.getElementById("kk-report-month").value);
 
-    const omsetning = Number(document.getElementById("kk-report-omsetning").value || 0);
-    const resultat = Number(document.getElementById("kk-report-resultat").value || 0);
+    const omsetning  = Number(document.getElementById("kk-report-omsetning").value || 0);
+    const resultat   = Number(document.getElementById("kk-report-resultat").value || 0);
     const likviditet = Number(document.getElementById("kk-report-likviditet").value || 0);
 
-    const items = [];
-
-    // Look up KPI IDs from meta
     const meta = KK.kpiMeta;
+    const payload = [];
 
-    function pushKpi(key, value) {
+    function addKpi(key, value) {
         const m = meta.find(x => x.key === key);
-        if (!m) return;
-        items.push({
+        if (!m) {
+            console.error("KPI missing:", key);
+            return;
+        }
+        payload.push({
             companyId,
             kpiId: m.id,
             value,
@@ -119,36 +139,57 @@ function submitReporting() {
         });
     }
 
-    pushKpi("omsetning", omsetning);
-    pushKpi("resultat", resultat);
-    pushKpi("likviditet", likviditet);
+    // Legg inn 3 KPI-typer
+    addKpi("omsetning", omsetning);
+    addKpi("resultat", resultat);
+    addKpi("likviditet", likviditet);
 
-    if (items.length === 0) {
-        return setReportStatus("Ingen KPI-er å lagre", "error");
+    if (!payload.length) {
+        return setReportStatus("Ingen KPI-data å sende.", "error");
     }
 
-    console.log("Sender rapportering:", items);
+    console.log("Rapporterer KPI:", payload);
 
     postNEON({
         table: "kpi_values",
-        data: items,
+        data: payload,
         responsId: "respReportSubmit"
     });
-
-    KK.responseHandlers.respReportSubmit = respReportSubmit;
 }
 
+// =======================================================================
+//  HANDLE RESPONSE
+// =======================================================================
 
 function respReportSubmit(data) {
     console.log("Rapportering lagret:", data);
+
     setReportStatus("Tallene er lagret!", "ok");
+
+    // Oppdater dashboard etter lagring
+    if (typeof window.refreshDashboard === "function") {
+        setTimeout(() => refreshDashboard(), 500);
+    }
 }
 
+// Registrer på globalt nivå (viktig at dette skjer før submit)
+window.responseHandlers = window.responseHandlers || {};
+window.responseHandlers.respReportSubmit = respReportSubmit;
 
-// ------------------------- Status UI -------------------------
+// =======================================================================
+//  STATUS UI
+// =======================================================================
 
 function setReportStatus(msg, type) {
-    const el = document.getElementById("kk-report-status");
+    let el = document.getElementById("kk-report-status");
+
+    if (!el) {
+        el = document.createElement("div");
+        el.id = "kk-report-status";
+        el.className = "kk-report-status";
+        document.getElementById("kk-report-panel")?.appendChild(el);
+    }
+
     el.textContent = msg;
     el.className = "kk-report-status " + type;
 }

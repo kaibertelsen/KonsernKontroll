@@ -1,131 +1,136 @@
 // =======================================================================
-// KonsernKontroll – Dashboard Sortering (dashboardSort.js)
+//  KonsernKontroll – Dashboard Sorting (dashboardSort.js)
+// =======================================================================
+//
+//  Integrerer med:
+//   - KK.companies (dashboard data)
+//   - getLatestKpiValues()  → fra kpi.js
+//   - calculateCompanyStatus() → statusfarger
+//   - renderCompanyCards() → fra dashboardCore.js
+//
 // =======================================================================
 
 window.KK = window.KK || {};
 
-document.addEventListener("DOMContentLoaded", () => {
-    if (!KK.ready) return;
+console.log("✓ DashboardSort loaded");
 
-    const select = document.getElementById("kk-sort-select");
-    if (!select) {
-        console.warn("Sort dropdown not found");
+// ----------------------------------------------------------------------
+// INIT – aktiver når siden er klar
+// ----------------------------------------------------------------------
+
+document.addEventListener("DOMContentLoaded", () => {
+    const dropdown = document.getElementById("kk-sort-select");
+    if (!dropdown) {
+        console.warn("DashboardSort: #kk-sort-select not found");
         return;
     }
 
-    // Apply sorting when changed
-    select.addEventListener("change", applyDashboardSort);
-
-    // Initial sort
-    applyDashboardSort();
+    dropdown.addEventListener("change", () => {
+        applyDashboardSort(dropdown.value);
+    });
 });
 
+// ----------------------------------------------------------------------
+// HOVEDFUNKSJON – SORTERE OG RENDER DASHBOARD
+// ----------------------------------------------------------------------
 
-// ------------------------------------------------------------
-// MAIN ENTRY
-// ------------------------------------------------------------
-function applyDashboardSort() {
-    if (!KK.companies || !KK.renderCompanies) {
-        console.warn("Dashboard sort: Missing KK.companies or KK.renderCompanies");
+window.applyDashboardSort = function (mode) {
+    if (!KK.companies || !Array.isArray(KK.companies)) {
+        console.warn("DashboardSort: KK.companies missing");
         return;
     }
 
-    const mode = document.getElementById("kk-sort-select").value;
-    const list = [...KK.companies]; // clone
+    KK.sortMode = mode || KK.sortMode || "name_asc";
 
-    const enriched = list.map(c => ({
-        ...c,
-        kpi: getLatestCompanyKpis(c.id),
-        status: calculateCompanyStatus(c.id).status
-    }));
+    const enriched = KK.companies.map(c => {
+        const kpi = getLatestKpiValues(c.id);
+        const statusObj = calculateCompanyStatus(c.id);
 
-    let sorted = [];
+        return {
+            ...c,
+            kpi,
+            status: statusObj.status
+        };
+    });
 
-    switch (mode) {
+    let sorted = [...enriched];
 
+    switch (KK.sortMode) {
+
+        // -----------------------
         // NAVN
+        // -----------------------
         case "name_asc":
-            sorted = enriched.sort((a,b) => a.name.localeCompare(b.name));
+            sorted.sort((a,b) => a.name.localeCompare(b.name));
             break;
 
         case "name_desc":
-            sorted = enriched.sort((a,b) => b.name.localeCompare(a.name));
+            sorted.sort((a,b) => b.name.localeCompare(a.name));
             break;
 
+        // -----------------------
         // OMSETNING
+        // -----------------------
         case "omsetning_desc":
-            sorted = enriched.sort((a,b) => (b.kpi.omsetning || 0) - (a.kpi.omsetning || 0));
+            sorted.sort((a,b) => (b.kpi.omsetning || 0) - (a.kpi.omsetning || 0));
             break;
 
         case "omsetning_asc":
-            sorted = enriched.sort((a,b) => (a.kpi.omsetning || 0) - (b.kpi.omsetning || 0));
+            sorted.sort((a,b) => (a.kpi.omsetning || 0) - (b.kpi.omsetning || 0));
             break;
 
+        // -----------------------
         // RESULTAT
+        // -----------------------
         case "resultat_desc":
-            sorted = enriched.sort((a,b) => (b.kpi.resultat || 0) - (a.kpi.resultat || 0));
+            sorted.sort((a,b) => (b.kpi.resultat || 0) - (a.kpi.resultat || 0));
             break;
 
         case "resultat_asc":
-            sorted = enriched.sort((a,b) => (a.kpi.resultat || 0) - (b.kpi.resultat || 0));
+            sorted.sort((a,b) => (a.kpi.resultat || 0) - (b.kpi.resultat || 0));
             break;
 
+        // -----------------------
         // LIKVIDITET
+        // -----------------------
         case "likviditet_desc":
-            sorted = enriched.sort((a,b) => (b.kpi.likviditet || 0) - (a.kpi.likviditet || 0));
+            sorted.sort((a,b) => (b.kpi.likviditet || 0) - (a.kpi.likviditet || 0));
             break;
 
         case "likviditet_asc":
-            sorted = enriched.sort((a,b) => (a.kpi.likviditet || 0) - (b.kpi.likviditet || 0));
+            sorted.sort((a,b) => (a.kpi.likviditet || 0) - (b.kpi.likviditet || 0));
             break;
 
-        // STATUS
+        // -----------------------
+        // STATUS (green → yellow → red)
+        // -----------------------
         case "status_best":
-            sorted = enriched.sort((a,b) => statusRank(a.status) - statusRank(b.status));
+            sorted.sort((a,b) => statusRank(a.status) - statusRank(b.status));
             break;
 
         case "status_worst":
-            sorted = enriched.sort((a,b) => statusRank(b.status) - statusRank(a.status));
+            sorted.sort((a,b) => statusRank(b.status) - statusRank(a.status));
             break;
-
-        default:
-            sorted = enriched;
     }
 
-    KK.renderCompanies(sorted);
-}
+    // Oppdater hovedlista
+    KK.companies = sorted;
+
+    // Re-render dashboard
+    if (typeof window.renderCompanyCards === "function") {
+        window.renderCompanyCards();
+    }
+};
 
 
+// ----------------------------------------------------------------------
+// STATUS PRIORITET
+// ----------------------------------------------------------------------
 
-// ------------------------------------------------------------
-// KPI PULLER
-// ------------------------------------------------------------
-function getLatestCompanyKpis(companyId) {
-    const rows = KK.kpiValues.filter(r => r.companyId === companyId);
-    const meta = KK.kpiMeta;
-
-    const latest = {};
-    rows.forEach(r => {
-        const m = meta.find(x => x.id === r.kpiId);
-        if (!m) return;
-
-        if (!latest[m.key] || new Date(r.createdAt) > new Date(latest[m.key].createdAt)) {
-            latest[m.key] = r;
-        }
-    });
-
-    const flat = {};
-    Object.keys(latest).forEach(k => flat[k] = Number(latest[k].value));
-
-    return flat;
-}
-
-
-// ------------------------------------------------------------
-// STATUS RANK FOR SORTING
-// ------------------------------------------------------------
 function statusRank(status) {
-    if (status === "green") return 1;
-    if (status === "yellow") return 2;
-    return 3; // red worst
+    switch (status) {
+        case "green": return 1;
+        case "yellow": return 2;
+        default: return 3; // red
+    }
 }

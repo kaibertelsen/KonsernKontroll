@@ -1,89 +1,145 @@
 // =======================================================================
-//  KonsernKontroll – KPI ENGINE
-//  Provides: getLatestKpiValues(), calculateCompanyStatus()
+//  KonsernKontroll – KPI ENGINE (kpi.js)
+// =======================================================================
+//
+//  Gir disse funksjonene:
+//
+//   ✔ getLatestKpiValues(companyId)
+//       → returnerer siste registrerte tall per KPI-type
+//
+//   ✔ getKpiStatus(company, metric)
+//       → returnerer "green" | "yellow" | "red" for dashboard
+//
+//   ✔ calculateCompanyStatus(companyId)
+//       → brukes til konsern-sum og ev. detaljer
+//
 // =======================================================================
 
 window.KK = window.KK || {};
 
+console.log("✓ KPI Engine loaded");
 
-// -----------------------------------------------------------
-//  Return latest KPI values per company
-// -----------------------------------------------------------
+
+// =======================================================================
+//  1) HENT SISTE KPI-VERDI FOR ET SELSKAP
+// =======================================================================
+
 function getLatestKpiValues(companyId) {
     const rows = (KK.kpiValues || []).filter(v => v.companyId === companyId);
+    const meta = KK.kpiMeta || [];
 
-    const latest = {};
-    rows.forEach(r => {
-        const meta = KK.kpiMeta.find(x => x.id === r.kpiId);
-        if (!meta) return;
+    // Sorter newest → oldest
+    rows.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
-        // find latest value for this kpi
-        if (!latest[meta.key] || new Date(r.createdAt) > new Date(latest[meta.key].createdAt)) {
-            latest[meta.key] = r;
+    const result = {};
+
+    for (const m of meta) {
+        const r = rows.find(x => x.kpiId === m.id);
+        if (r) {
+            result[m.key] = Number(r.value);
         }
-    });
+    }
 
-    const output = {};
-    Object.keys(latest).forEach(key => {
-        output[key] = Number(latest[key].value);
-    });
-
-    return output;
+    return result;
 }
 
 
-// -----------------------------------------------------------
-//  Compute company status (green/yellow/red)
-// -----------------------------------------------------------
+// =======================================================================
+//  2) HENT COMPANY_SETTINGS
+// =======================================================================
+
+function getCompanySettings(companyId) {
+    return (KK.companySettings || []).filter(s => s.companyId === companyId);
+}
+
+
+// =======================================================================
+//  3) BEREGN KPI-STATUS FOR ÉN KPI-TYPE
+// =======================================================================
+//
+//  metric = "omsetning" | "resultat" | "likviditet"
+//
+
+function getKpiStatus(company, metric) {
+
+    if (!company?.id) return "gray";
+
+    const companyId = company.id;
+
+    const latest = getLatestKpiValues(companyId);
+    const settings = getCompanySettings(companyId);
+    const meta = KK.kpiMeta.find(m => m.key === metric);
+
+    if (!meta) return "gray";
+
+    const value = Number(latest[metric] || 0);
+    const budsjett = Number(latest["budsjett"] || 0);
+
+    // Ingen tall → gul
+    if (!budsjett) return "yellow";
+
+    // Finn avvik-prosent for denne KPI-typen
+    const setting = settings.find(s => s.kpiId === meta.id);
+    const allowedPct = setting ? Number(setting.avvikProsent) : 10;
+
+    const allowedDeviation = budsjett * (allowedPct / 100);
+    const deviation = Math.abs(value - budsjett);
+
+    if (deviation <= allowedDeviation) {
+        return "green";
+    }
+    if (deviation <= allowedDeviation * 2) {
+        return "yellow";
+    }
+    return "red";
+}
+
+
+// =======================================================================
+//  4) FULL COMPANY STATUS (samler alle KPI'er)
+// =======================================================================
+
 function calculateCompanyStatus(companyId) {
 
     const latest = getLatestKpiValues(companyId);
-    const settings = (KK.companySettings || []).filter(s => s.companyId === companyId);
+    const settings = getCompanySettings(companyId);
     const meta = KK.kpiMeta || [];
 
-    // If missing data → warning status
     if (!latest || Object.keys(latest).length === 0) {
         return { status: "yellow", reason: "Mangler KPI-data" };
     }
 
-    let worstStatus = "green";
+    let worst = "green";
 
-    meta.forEach(m => {
-        const key = m.key;
+    for (const m of meta) {
+        if (m.key === "budsjett") continue;
 
-        if (key === "budsjett") return;
-
-        const actual = Number(latest[key] || 0);
+        const value = Number(latest[m.key] || 0);
         const budsjett = Number(latest["budsjett"] || 0);
-
         if (!budsjett) {
-            worstStatus = "yellow";
-            return;
+            worst = "yellow";
+            continue;
         }
 
         const setting = settings.find(s => s.kpiId === m.id);
-        const avvik = setting ? Number(setting.avvikProsent) : 10;
+        const pct = setting ? Number(setting.avvikProsent) : 10;
 
-        const allowedDeviation = budsjett * (avvik / 100);
-        const deviation = Math.abs(budsjett - actual);
+        const allowed = budsjett * (pct / 100);
+        const deviation = Math.abs(value - budsjett);
 
-        if (deviation <= allowedDeviation) {
-            // green
-        } else if (deviation <= allowedDeviation * 2) {
-            worstStatus = (worstStatus === "red") ? "red" : "yellow";
-        } else {
-            worstStatus = "red";
-        }
-    });
+        if (deviation > allowed * 2) worst = "red";
+        else if (deviation > allowed && worst !== "red") worst = "yellow";
+    }
 
-    return { status: worstStatus, reason: "" };
+    return { status: worst, reason: "" };
 }
 
 
-// -----------------------------------------------------------
-//  Expose to global (UMD style)
-// -----------------------------------------------------------
-window.getLatestKpiValues = getLatestKpiValues;
-window.calculateCompanyStatus = calculateCompanyStatus;
+// =======================================================================
+//  EKSPORT GLOBALE FUNKSJONER
+// =======================================================================
 
-console.log("KonsernKontroll KPI engine loaded");
+window.getLatestKpiValues = getLatestKpiValues;
+window.getKpiStatus = getKpiStatus;
+window.calculateCompanyStatus = calculateCompanyStatus;
+window.getCompanySettings = getCompanySettings;

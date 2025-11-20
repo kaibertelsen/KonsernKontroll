@@ -1,114 +1,61 @@
-// =======================================================================
-//  KonsernKontroll – Company Detail Page (companydetail.js)
-// =======================================================================
+/* ======================================================================
+   KonsernKontroll – Company Detail Page
+   Viser:
+   - Navn på selskapet
+   - KPI-grafer (omsetning, resultat, likviditet)
+   - Tilbakeknapp
+====================================================================== */
+
+console.log("✓ CompanyDetail loaded");
 
 window.KK = window.KK || {};
 
+// Chart-referanser
 let chartOmsetning = null;
 let chartResultat = null;
 let chartLikviditet = null;
 
-document.addEventListener("DOMContentLoaded", () => {
-    if (!KK.ready) {
-        console.warn("startup.js ikke klar ennå");
+/* ======================================================================
+   HOVEDFUNKSJON – KALLES FRA dashboardCore.js
+====================================================================== */
+window.KK.loadCompanyDetail = function (companyId) {
+
+    const company = KK.companies.find(c => c.id === companyId);
+    if (!company) {
+        console.error("❌ Fant ikke selskap med id:", companyId);
         return;
     }
 
-    // Skal vi vise detaljer kun hvis selskap-id er sendt?
-    const cid = getCompanyIdFromUrl();
-    if (!cid) {
-        console.warn("Ingen companyId i URL");
-        return;
-    }
+    // Bytt panel
+    document.getElementById("kk-dashboard").classList.add("kk-hidden");
+    document.getElementById("kk-company-detail").classList.remove("kk-hidden");
 
-    loadCompanyDetail(cid);
+    // Sett tittel
+    document.getElementById("kk-detail-title").textContent = company.name;
+
+    // Filtrer KPI-verdier for selskapet
+    const rows = KK.kpiValues.filter(r => r.companyId === companyId);
+
+    // Tegn grafer
+    buildCharts(rows, KK.kpiMeta);
+};
+
+
+/* ======================================================================
+   TILBAKE-KNAPP
+====================================================================== */
+document.getElementById("kk-detail-back")?.addEventListener("click", () => {
+    document.getElementById("kk-company-detail").classList.add("kk-hidden");
+    document.getElementById("kk-dashboard").classList.remove("kk-hidden");
 });
 
 
-// ------------------------------------------------------------
-// Hent ?companyId=123
-// ------------------------------------------------------------
-function getCompanyIdFromUrl() {
-    const url = new URL(window.location.href);
-    return Number(url.searchParams.get("companyId"));
-}
-
-
-// ------------------------------------------------------------
-// MAIN FLOW
-// ------------------------------------------------------------
-function loadCompanyDetail(companyId) {
-    const company = KK.companies.find(c => c.id === companyId);
-    if (!company) return;
-
-    document.getElementById("kk-detail-title").textContent = company.name;
-
-    const rows = KK.kpiValues.filter(v => v.companyId === companyId);
-    const meta = KK.kpiMeta;
-
-    // sammendrag
-    const latest = getLatestKpiValues(companyId);
-    setSummary(latest);
-
-    // tabell
-    fillHistoryTable(rows);
-
-    // grafer
-    buildCharts(rows, meta);
-}
-
-
-// ------------------------------------------------------------
-// SUMMARY BOX INFO
-// ------------------------------------------------------------
-function setSummary(latest) {
-    document.getElementById("kk-meta-omsetning").textContent =
-        latest.omsetning ? formatNumber(latest.omsetning) : "-";
-
-    document.getElementById("kk-meta-resultat").textContent =
-        latest.resultat ? formatNumber(latest.resultat) : "-";
-
-    document.getElementById("kk-meta-likviditet").textContent =
-        latest.likviditet ? formatNumber(latest.likviditet) : "-";
-
-    document.getElementById("kk-meta-budsjett").textContent =
-        latest.budsjett ? formatNumber(latest.budsjett) : "-";
-}
-
-
-// ------------------------------------------------------------
-// TABLE
-// ------------------------------------------------------------
-function fillHistoryTable(list) {
-    const body = document.getElementById("kk-detail-table-body");
-    body.innerHTML = "";
-
-    list.sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
-
-    list.forEach(row => {
-        const kpi = KK.kpiMeta.find(k => k.id === row.kpiId);
-
-        const tr = document.createElement("tr");
-
-        tr.innerHTML = `
-            <td>${capitalize(kpi.key)}</td>
-            <td>${formatNumber(row.value)}</td>
-            <td>${row.year || "-"}</td>
-            <td>${row.month || "-"}</td>
-            <td>${new Date(row.createdAt).toLocaleDateString()}</td>
-        `;
-
-        body.appendChild(tr);
-    });
-}
-
-
-// ------------------------------------------------------------
-// GRAPHS
-// ------------------------------------------------------------
+/* ======================================================================
+   GRAF-BYGGER (Samler KPI-verdier)
+====================================================================== */
 function buildCharts(rows, meta) {
 
-    const byKpi = {
+    const bucket = {
         omsetning: [],
         resultat: [],
         likviditet: []
@@ -117,58 +64,42 @@ function buildCharts(rows, meta) {
     rows.forEach(r => {
         const m = meta.find(x => x.id === r.kpiId);
         if (!m) return;
-
-        if (byKpi[m.key]) {
-            byKpi[m.key].push(r);
-        }
+        if (bucket[m.key]) bucket[m.key].push(r);
     });
 
-    drawLineChart(
-        "kk-chart-omsetning",
-        "Omsetning",
-        byKpi.omsetning
-    );
-
-    drawLineChart(
-        "kk-chart-resultat",
-        "Resultat",
-        byKpi.resultat
-    );
-
-    drawLineChart(
-        "kk-chart-likviditet",
-        "Likviditet",
-        byKpi.likviditet
-    );
+    drawLineChart("kk-chart-omsetning", "Omsetning", bucket.omsetning);
+    drawLineChart("kk-chart-resultat", "Resultat", bucket.resultat);
+    drawLineChart("kk-chart-likviditet", "Likviditet", bucket.likviditet);
 }
 
 
-// ------------------------------------------------------------
-// SINGLE LINE CHART
-// ------------------------------------------------------------
+/* ======================================================================
+   TEGN LINECHART (Chart.js)
+====================================================================== */
 function drawLineChart(canvasId, label, values) {
     const ctx = document.getElementById(canvasId);
+    if (!ctx) {
+        console.warn("Canvas mangler:", canvasId);
+        return;
+    }
 
-    // sort after year + month
-    values.sort((a,b) => {
-        const da = new Date(a.year, (a.month||1)-1);
-        const db = new Date(b.year, (b.month||1)-1);
+    // Sorter kronologisk
+    values.sort((a, b) => {
+        const da = new Date(a.year, (a.month || 1) - 1);
+        const db = new Date(b.year, (b.month || 1) - 1);
         return da - db;
     });
 
     const labels = values.map(v =>
-        `${v.year}-${String(v.month || 1).padStart(2,"0")}`
+        `${v.year}-${String(v.month || 1).padStart(2, "0")}`
     );
 
-    const dataPoints = values.map(v => Number(v.value));
+    const data = values.map(v => Number(v.value));
 
-    // Destroy old if exists
-    let chartRef = null;
-    if (canvasId === "kk-chart-omsetning") chartRef = chartOmsetning;
-    if (canvasId === "kk-chart-resultat") chartRef = chartResultat;
-    if (canvasId === "kk-chart-likviditet") chartRef = chartLikviditet;
-
-    if (chartRef) chartRef.destroy();
+    // Fjern gamle grafer
+    if (canvasId === "kk-chart-omsetning" && chartOmsetning) chartOmsetning.destroy();
+    if (canvasId === "kk-chart-resultat" && chartResultat) chartResultat.destroy();
+    if (canvasId === "kk-chart-likviditet" && chartLikviditet) chartLikviditet.destroy();
 
     const chart = new Chart(ctx, {
         type: "line",
@@ -176,17 +107,16 @@ function drawLineChart(canvasId, label, values) {
             labels,
             datasets: [{
                 label,
-                data: dataPoints,
-                borderColor: "#1a73e8",
-                backgroundColor: "rgba(26,115,232,0.2)",
+                data,
+                borderColor: "#0074F0",
+                backgroundColor: "rgba(0, 116, 240, 0.20)",
                 borderWidth: 2,
-                tension: 0.25,
-                pointRadius: 3
+                tension: 0.25
             }]
         },
         options: {
-            responsive: true,
             plugins: { legend: { display: false } },
+            responsive: true,
             scales: {
                 y: { beginAtZero: false }
             }
@@ -199,13 +129,10 @@ function drawLineChart(canvasId, label, values) {
 }
 
 
-// ------------------------------------------------------------
-// helpers
-// ------------------------------------------------------------
+/* ======================================================================
+   HELPERS
+====================================================================== */
 function formatNumber(n) {
-    return Number(n).toLocaleString("no-NO");
+    return Number(n).toLocaleString("nb-NO");
 }
 
-function capitalize(str) {
-    return str.charAt(0).toUpperCase() + str.slice(1);
-}

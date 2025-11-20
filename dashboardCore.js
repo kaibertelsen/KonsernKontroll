@@ -1,225 +1,139 @@
-/* ----------------------------------------------------
-   KonsernKontroll – Dashboard Core Engine
-   Denne filen er ansvarlig for å:
-   - Tegne selskapkort på dashboard
-   - Håndtere sortering
-   - Håndtere KPI-status
-   - Aktivere click-handlers for detaljside
------------------------------------------------------*/
+/* ======================================================================
+   KonsernKontroll – Dashboard Core
+   Viser:
+   - Alle selskaper for innlogget klient
+   - KPI-status (grønn / gul / rød)
+   - KPI-verdier (omsetning, resultat, likviditet, budsjett)
+   - Klikk → åpne detaljside
+====================================================================== */
 
-// GLOBAL RENDER STATE
-window.KK = {
-    companies: [],       // selskap for dashboard
-    userRole: null,      // "superadmin" | "controller" | "user"
-    activeClient: null,  // konsern
-    sortMode: "name",    // default sortering
-};
+console.log("✓ DashboardCore loaded");
 
+// GLOBAL NAMESPACE
+window.KK = window.KK || {};
+KK.companies = [];
+KK.kpiMeta = [];
+KK.kpiValues = [];
+KK.companySettings = [];
 
-/* ----------------------------------------------------
-   PUBLIC API – kall disse fra startup.js
------------------------------------------------------*/
-
-window.setDashboardContext = function ({ companies, userRole, client }) {
-    KK.companies = companies || [];
-    KK.userRole = userRole || "user";
-    KK.activeClient = client || null;
-
-    renderCompanyCards();
-};
-
-
-/* ----------------------------------------------------
-   Hovedfunksjon: renderCompanyCards()
------------------------------------------------------*/
-window.renderCompanyCards = function () {
-    const container = document.getElementById("company-list");
-    if (!container) {
-        console.warn("company-list container not found");
-        return;
-    }
-
-    container.innerHTML = "";
+/* ======================================================================
+   PUBLIC API – Kalles fra startup.js → loadDashboard()
+====================================================================== */
+window.renderDashboard = function () {
+    console.log("▶️ renderDashboard()");
 
     if (!KK.companies.length) {
-        container.innerHTML = `
-            <div class="no-data">
-                Ingen selskaper tilgjengelig.
-            </div>
-        `;
+        console.warn("Ingen companies funnet. Avventer startup.js…");
         return;
     }
 
-    // Kjør sortering dersom dashboardSort.js eksisterer
-    if (typeof window.applyDashboardSort === "function") {
-        KK.companies = window.applyDashboardSort(KK.companies, KK.sortMode);
-    }
+    renderCompanyList(KK.companies);
 
-    KK.companies.forEach(company => {
-        container.appendChild(renderSingleCompanyCard(company));
-    });
+    // Gi sorteringsmodulen tilgang
+    KK.renderCompanies = renderCompanyList;
 
-    // Oppdater konsernsum
-    if (typeof window.updateKonsernSum === "function") {
-        window.updateKonsernSum(KK.companies);
+    // Initial sort
+    if (typeof applyDashboardSort === "function") {
+        applyDashboardSort();
     }
 };
 
+/* ======================================================================
+   Tegner hele company-list
+====================================================================== */
+function renderCompanyList(companies) {
+    const list = document.getElementById("kk-company-list");
+    if (!list) {
+        console.error("❌ #kk-company-list not found");
+        return;
+    }
 
-/* ----------------------------------------------------
+    list.innerHTML = "";
+
+    if (!companies.length) {
+        list.innerHTML = "<p>Ingen selskaper funnet.</p>";
+        return;
+    }
+
+    companies.forEach(company => list.appendChild(renderCompanyCard(company)));
+}
+
+/* ======================================================================
    Render ett selskapskort
------------------------------------------------------*/
-function renderSingleCompanyCard(company) {
-    const {
-        id,
-        name,
-        revenue_ytd,
-        result_ytd,
-        liquidity_ytd
-    } = company;
+====================================================================== */
+function renderCompanyCard(company) {
+    const latest = getLatestKpiValues(company.id);       // fra kpi.js
+    const status = calculateCompanyStatus(company.id);   // fra kpi.js
 
-    // KPI farger
-    const statusRevenue = getStatusColor(company, "revenue");
-    const statusResult = getStatusColor(company, "result");
-    const statusLiquidity = getStatusColor(company, "liquidity");
+    const div = document.createElement("div");
+    div.className = "kk-company-card";
 
-    const card = document.createElement("div");
-    card.className = "company-card";
-    card.dataset.companyId = id;
-
-    card.innerHTML = `
-        <div class="company-card-header">
-            <h3>${name}</h3>
+    div.innerHTML = `
+        <div class="kk-company-header">
+            <h3>${company.name}</h3>
+            <span class="kk-company-org">Org.nr: ${company.orgnr || "-"}</span>
         </div>
 
-        <div class="company-metrics">
-
-            <div class="metric">
-                <label>Omsetning</label>
-                <span class="metric-value">${formatNumber(revenue_ytd)} kr</span>
-                <span class="status-dot ${statusRevenue}"></span>
-            </div>
-
-            <div class="metric">
-                <label>Resultat</label>
-                <span class="metric-value">${formatNumber(result_ytd)} kr</span>
-                <span class="status-dot ${statusResult}"></span>
-            </div>
-
-            <div class="metric">
-                <label>Likviditet</label>
-                <span class="metric-value">${formatNumber(liquidity_ytd)} kr</span>
-                <span class="status-dot ${statusLiquidity}"></span>
-            </div>
-
+        <div class="kk-company-kpi">
+            <div><label>Omsetning:</label> <strong>${formatNumber(latest.omsetning)}</strong></div>
+            <div><label>Resultat:</label> <strong>${formatNumber(latest.resultat)}</strong></div>
+            <div><label>Likviditet:</label> <strong>${formatNumber(latest.likviditet)}</strong></div>
+            <div><label>Budsjett:</label> <strong>${formatNumber(latest.budsjett)}</strong></div>
         </div>
+
+        <div class="kk-company-status kk-status-${status.status}">
+            Status: ${status.status.toUpperCase()}
+        </div>
+
+        <button class="kk-btn kk-btn-primary kk-open-detail" data-id="${company.id}">
+            Åpne detaljer →
+        </button>
     `;
 
-    // Klikk = åpne detaljside
-    card.addEventListener("click", () => {
-        if (typeof window.openCompanyDetail === "function") {
-            window.openCompanyDetail(id);
-        } else {
-            console.warn("openCompanyDetail() mangler");
-        }
+    // Klikk → åpne detaljer
+    div.querySelector(".kk-open-detail").onclick = () => openCompanyDetail(company.id);
+
+    return div;
+}
+
+/* ======================================================================
+   Åpne selskapets detaljside
+====================================================================== */
+async function openCompanyDetail(companyId) {
+    console.log("➡️ Åpner detaljer for selskap", companyId);
+
+    KK.currentCompanyId = companyId;
+
+    // Hent selskapet – så companydetail.js får freshe data
+    await getNEON({
+        table: "companies",
+        where: { id: companyId },
+        limit: 1,
+        responsId: "companyDetailLoaded"
     });
 
-    return card;
-}
-
-
-/* ----------------------------------------------------
-   KPI-status henter fra kpi.js via getKpiStatus()
------------------------------------------------------*/
-function getStatusColor(company, metric) {
-    if (typeof window.getKpiStatus !== "function") {
-        console.warn("getKpiStatus() mangler");
-        return "gray";
+    if (typeof showPanel === "function") {
+        showPanel("companyDetail");
     }
-    return window.getKpiStatus(company, metric);
 }
 
-
-/* ----------------------------------------------------
-   Formatering
------------------------------------------------------*/
-function formatNumber(value) {
-    if (!value && value !== 0) return "0";
-    return Number(value).toLocaleString("nb-NO");
-}
-
-
-/* ----------------------------------------------------
-   Ekstern sorteringskontroll
------------------------------------------------------*/
-window.setDashboardSortMode = function (mode) {
-    KK.sortMode = mode;
-    renderCompanyCards();
-};
-
-
-/* ----------------------------------------------------
-  Reload dashboard after data update
------------------------------------------------------*/
-window.refreshDashboard = function () {
-    renderCompanyCards();
-};
-
-console.log("✓ KonsernKontroll DashboardCore loaded");
-
-
-// ======================================================================
-// RENDER COMPANY CARDS (DASHBOARD)
-// ======================================================================
-
-function renderCompanyCards(companies = KK.cacheCompanies || []) {
-    if (!Array.isArray(companies)) {
-        console.error("renderCompanyCards: invalid companies array", companies);
+window.responseHandlers.companyDetailLoaded = function (data) {
+    const row = data.rows?.[0];
+    if (!row) {
+        console.error("❌ companyDetailLoaded: fant ikke selskap");
         return;
     }
 
-    KK.cacheCompanies = companies;
+    document.getElementById("kk-detail-title").textContent = row.name;
 
-    const container = document.getElementById("kk-company-list");
-    if (!container) {
-        console.warn("renderCompanyCards: #kk-company-list not found in DOM");
-        return;
-    }
+    // Når detaillogikk skal inn, fortsetter vi her
+};
 
-    container.innerHTML = ""; // Clear previous
-
-    companies.forEach(company => {
-        const card = document.createElement("div");
-        card.classList.add("kk-company-card");
-
-        card.innerHTML = `
-            <div class="kk-company-header">
-                <h3>${company.name}</h3>
-                <span class="kk-company-org">${company.orgnr || ""}</span>
-            </div>
-
-            <div class="kk-company-kpi">
-                <div><label>Omsetning:</label> <span>${formatNumber(company.omsetning)}</span></div>
-                <div><label>Resultat:</label> <span>${formatNumber(company.resultat)}</span></div>
-                <div><label>Likviditet:</label> <span>${formatNumber(company.likviditet)}</span></div>
-                <div><label>Budsjett:</label> <span>${formatNumber(company.budsjett)}</span></div>
-            </div>
-
-            <button class="kk-btn-detail" data-id="${company.id}">
-                Åpne detaljer →
-            </button>
-        `;
-
-        // Klikk: vis detaljer
-        card.querySelector(".kk-btn-detail")
-            .addEventListener("click", () => {
-                if (typeof KK.loadCompanyDetail === "function") {
-                    KK.loadCompanyDetail(company.id);
-                } else {
-                    console.error("KK.loadCompanyDetail mangler!");
-                }
-            });
-
-        container.appendChild(card);
-    });
+/* ======================================================================
+   Utils
+====================================================================== */
+function formatNumber(n) {
+    if (n === undefined || n === null) return "-";
+    return Number(n).toLocaleString("nb-NO");
 }
+

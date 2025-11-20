@@ -1,48 +1,43 @@
 // =======================================================================
 //  KonsernKontroll – USER ADMINISTRATION
-//  Listing, creating, editing, deleting users
 // =======================================================================
 
-// GLOBAL NAMESPACE
+console.log("✓ User Administration loaded");
+
 window.KK = window.KK || {};
 KK.users = KK.users || [];
 
-
 // =======================================================================
-//   OPEN / CLOSE MODAL
+//  OPEN / CLOSE MODAL
 // =======================================================================
 
 function openUserAdminModal() {
     const modal = document.getElementById("kk-user-admin-modal");
-    if (!modal) return console.error("User admin modal not found in DOM");
+    if (!modal) return console.error("❌ kk-user-admin-modal not found");
     
-    modal.style.display = "flex";
+    modal.classList.remove("kk-hidden");
     loadUsersList();
 }
 
 function closeUserAdminModal() {
     const modal = document.getElementById("kk-user-admin-modal");
-    if (modal) modal.style.display = "none";
+    if (modal) modal.classList.add("kk-hidden");
 }
 
-// Buttons (if they exist in current view)
-document.getElementById("kk-admin-users-btn")?.addEventListener("click", openUserAdminModal);
+// riktig knapp-ID fra HTML:
+document.getElementById("kk-nav-admin-users")?.addEventListener("click", openUserAdminModal);
 document.getElementById("kk-user-admin-close")?.addEventListener("click", closeUserAdminModal);
 
 
 // =======================================================================
-//   LOAD USERS (Controller + Superadmin)
+//  LOAD USERS
 // =======================================================================
 
 function loadUsersList() {
-    if (!KK.user) {
-        console.warn("KK.user not set yet");
-        return;
-    }
+    if (!KK.user) return console.warn("KK.user not loaded yet");
 
     if (!["controller", "superadmin"].includes(KK.user.role)) {
-        console.warn("User not allowed to load user list");
-        return;
+        return console.warn("🔐 User lacks permission to manage users");
     }
 
     getNEON({
@@ -53,20 +48,18 @@ function loadUsersList() {
 }
 
 function respUsersList(data) {
-    console.log("User list response:", data);
-
     KK.users = data?.rows || [];
     renderUsersList();
 }
 
 
 // =======================================================================
-//   RENDER USER LIST INSIDE MODAL
+//  RENDER USER LIST
 // =======================================================================
 
 function renderUsersList() {
     const container = document.getElementById("kk-user-admin-list");
-    if (!container) return console.error("kk-user-admin-list not found");
+    if (!container) return console.error("kk-user-admin-list missing");
 
     container.innerHTML = "";
 
@@ -78,23 +71,16 @@ function renderUsersList() {
     KK.users.forEach(user => {
         const row = document.createElement("div");
         row.className = "kk-user-row";
-        row.style = `
-            display:flex;
-            align-items:center;
-            justify-content:space-between;
-            border-bottom:1px solid var(--kk-border);
-            padding:10px 0;
-        `;
 
         row.innerHTML = `
             <div>
                 <strong>${user.name}</strong><br>
-                <span style="color:var(--kk-text-light);">${user.email}</span>
+                <span class="kk-text-light">${user.email}</span>
             </div>
 
-            <div style="display:flex; gap:10px; align-items:center;">
-                <select data-user-id="${user.id}" class="kk-edit-role kk-input" style="width:140px;">
-                    <option value="user" ${user.role === "user" ? "selected" : ""}>Bruker</option>
+            <div class="kk-admin-actions">
+                <select class="kk-edit-role" data-user-id="${user.id}">
+                    <option value="user"       ${user.role === "user" ? "selected" : ""}>Bruker</option>
                     <option value="controller" ${user.role === "controller" ? "selected" : ""}>Controller</option>
                     <option value="superadmin" ${user.role === "superadmin" ? "selected" : ""}>Superadmin</option>
                 </select>
@@ -107,26 +93,20 @@ function renderUsersList() {
         container.appendChild(row);
     });
 
-    // Bind "save" buttons
+    // Save handlers
     container.querySelectorAll("[data-edit]").forEach(btn => {
-        btn.addEventListener("click", () => {
-            const userId = btn.getAttribute("data-edit");
-            saveUserChanges(userId);
-        });
+        btn.onclick = () => saveUserChanges(btn.dataset.edit);
     });
 
-    // Bind delete buttons
+    // Delete handlers
     container.querySelectorAll("[data-delete]").forEach(btn => {
-        btn.addEventListener("click", () => {
-            const userId = btn.getAttribute("data-delete");
-            deleteUser(userId);
-        });
+        btn.onclick = () => deleteUser(btn.dataset.delete);
     });
 }
 
 
 // =======================================================================
-//   SAVE USER CHANGES
+//  UPDATE USER
 // =======================================================================
 
 function saveUserChanges(userId) {
@@ -146,13 +126,13 @@ function saveUserChanges(userId) {
 }
 
 function respUserUpdated(data) {
-    console.log("User updated", data);
+    console.log("User updated:", data);
     loadUsersList();
 }
 
 
 // =======================================================================
-//   DELETE USER
+//  DELETE USER
 // =======================================================================
 
 function deleteUser(userId) {
@@ -160,19 +140,22 @@ function deleteUser(userId) {
 
     deleteNEON({
         table: "users",
-        data: Number(userId),
+        data: {
+            field: "id",
+            value: userId
+        },
         responsId: "respUserDeleted"
     });
 }
 
 function respUserDeleted(data) {
-    console.log("User deleted", data);
+    console.log("User deleted:", data);
     loadUsersList();
 }
 
 
 // =======================================================================
-//   ADD NEW USER
+//  ADD NEW USER
 // =======================================================================
 
 document.getElementById("kk-add-user-btn")?.addEventListener("click", addNewUser);
@@ -189,19 +172,21 @@ function addNewUser() {
 
     postNEON({
         table: "users",
-        data: {
-            clientId: KK.user.clientId,
-            name,
-            email,
-            role,
-            neonUserId: null
-        },
+        data: [
+            {
+                clientId: KK.user.clientId,
+                name,
+                email,
+                role,
+                neonUserId: null
+            }
+        ],
         responsId: "respUserCreated"
     });
 }
 
 function respUserCreated(data) {
-    console.log("New user created", data);
+    console.log("User created:", data);
 
     document.getElementById("kk-new-user-name").value = "";
     document.getElementById("kk-new-user-email").value = "";
@@ -212,16 +197,13 @@ function respUserCreated(data) {
 
 
 // =======================================================================
-//   REGISTER HANDLERS GLOBALLY
+//  REGISTER RESPONSE HANDLERS
 // =======================================================================
 
 window.responseHandlers = window.responseHandlers || {};
-
 Object.assign(window.responseHandlers, {
     respUsersList,
     respUserUpdated,
     respUserDeleted,
     respUserCreated
 });
-
-console.log("User Administration JS loaded");
