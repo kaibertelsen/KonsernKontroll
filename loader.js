@@ -16,7 +16,7 @@ function loadScript(url) {
 
 // Liste over CDN-URL-er som skal lastes inn
 const cdnScripts = [
-    "konsernkontroll.js", 
+   "https://kaibertelsen.github.io/KonsernKontroll/konsernkontroll.js",
 ];
 
 // Laste inn alle skriptene sekvensielt
